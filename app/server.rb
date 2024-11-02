@@ -9,10 +9,12 @@ class YourRedisServer
     server = TCPServer.new(@port)
     client = server.accept
   end
-  
-  def ping
-    "+PONG\r\n"
-  end
 end
 
-YourRedisServer.new(6379).start
+redis_cli = YourRedisServer.new(6379).start
+
+while line = redis_cli.gets
+  if(line.chomp.include?("PING"))
+    redis_cli.puts "+PONG\r\n"
+  end
+end
