@@ -1,4 +1,5 @@
 require "socket"
+require_relative "resp_parser"
 
 class RedisServer
   attr_reader :server, :clients
@@ -31,9 +32,17 @@ class RedisServer
   end
 
   def handle_client(client)
-    client.readpartial(1024)
-    client.write("+PONG\r\n")
-  rescue EOFError
+    data = client.readpartial(1024)
+    parser = RESPParser.new(data)
+    parsed_data = parser.parse
+    command, message = parsed_data[:data]
+    case command
+    when "PING"
+      client.write("+PONG\r\n")
+    when "ECHO"
+      client.write(parser.encode(message, "bulk_string"))
+    end
+  rescue StandardError
   end
 end
 
