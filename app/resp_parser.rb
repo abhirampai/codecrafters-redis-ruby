@@ -55,10 +55,10 @@ class RESPParser
       @current_index += 1
       @result = { data: parse_array, type: "push" }
     else
-      raise "Unknown parse type refer to redis protocol (https://redis.io/docs/latest/develop/reference/protocol-spec)"
+      p "Unknown parse type refer to redis protocol (https://redis.io/docs/latest/develop/reference/protocol-spec)"
     end
   end
-  
+
   def encode(data, type)
     case type
     when "simple_string"
@@ -66,8 +66,9 @@ class RESPParser
     when "simple_error"
       "-"#{data}\r\n"
     when "bulk_string"
-      data_length = data.length.zero? ? -1 : data.length
-      "$#{data_length}\r\n#{data}\r\n"
+      return "$-1\r\n" if data.length.zero?
+
+      "$#{data.length}\r\n#{data}\r\n"
     when "integer"
       ":#{data}\r\n"
     when "double"
@@ -109,21 +110,23 @@ class RESPParser
   end
 
   def parse_integer
-    data = resp[current_index..].split("\r\n").first.to_i
+    data = resp[current_index..].split("\r\n").first
     @current_index += data.length + 3
-    data
+    data.to_i
   end
 
   def parse_bulk_string
-    length = resp[current_index].to_i
-    data = resp[current_index + 3..length + current_index + 2]
-    @current_index += length + 5
+    length = resp[current_index..].split("\r\n").first.to_i
+    start_index = current_index + length.digits.size + 2
+    end_index = start_index + length - 1
+    data = resp[start_index..end_index]
+    @current_index = end_index + 3
     data
   end
 
   def parse_array
-    number_of_elements = resp[current_index].to_i
-    @current_index += 3
+    number_of_elements = resp[current_index..].split("\r\n").first.to_i
+    @current_index += number_of_elements.digits.size + 2
     array = []
     number_of_elements.times do
       array << parse[:data]
@@ -139,20 +142,20 @@ class RESPParser
   end
 
   def parse_doubles
-    data = resp[current_index..].split("\r\n").first.to_f
+    data = resp[current_index..].split("\r\n").first
     @current_index += data.length + 3
-    data
+    data.to_f
   end
 
   def parse_big_number
     data = resp[current_index..].split("\r\n").first
     @current_index += data.length + 3
-    data
+    data.to_i
   end
 
   def parse_bulk_errors
-    number_of_elements = resp[current_index].to_i
-    @current_index += 3
+    number_of_elements = resp[current_index..].split("\r\n").first.to_i
+    @current_index += number_of_elements.digits.size + 2
     array = []
     number_of_elements.times do
       data = resp[current_index..].split("\r\n").first
@@ -163,15 +166,17 @@ class RESPParser
   end
 
   def parse_verbatim_string
-    length = resp[current_index].to_i
+    length = resp[current_index..].split("\r\n").first.to_i
+    start_index = current_index + length.digits.size + 2
+    end_index = start_index + length - 1
     data = resp[current_index + 3..length + current_index + 2]
-    @current_index += length + 5
+    @current_index += end_index + 3
     data
   end
 
   def parse_map
-    number_of_elements = resp[current_index].to_i
-    @current_index += 3
+    number_of_elements = resp[current_index..].split("\r\n").first.to_i
+    @current_index += number_of_elements.digits.size + 2
     map = {}
     number_of_elements.times do
       key = parse[:data]
