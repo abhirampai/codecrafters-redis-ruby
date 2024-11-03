@@ -74,24 +74,12 @@ class RESPParser
     when "double"
       ",#{data}\r\n"
     when "array"
-      "*#{data.length}\r\n"
-      data.each do |element|
-        encode(element)
-      end
-      "\r\n"
+      "*#{data.length}\r\n#{data.map { |d| encode(d, "bulk_string") }.join("")}"
     when "set"
-      "~#{data.length}\r\n"
-      data.each do |element|
-        encode(element)
-      end
-      "\r\n"
+      "~#{data.length}\r\n#{data.map { |d| encode(d, "bulk_string") }.join("")}"
     when "map"
-      "%#{data.length}\r\n"
-      data.each do |key, value|
-        self.encode(key)
-        self.encode(value)
-      end
-      "\r\n"
+      data_map = data.map { |k, v| encode(k, "bulk_string") + encode(v, "bulk_string") }.join("")
+      "%#{data.length}\r\n#{data_map}"
     else
       raise "Unknown encode type refer to redis protocol (https://redis.io/docs/latest/develop/reference/protocol-spec)"
     end

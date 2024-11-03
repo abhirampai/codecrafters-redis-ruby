@@ -1,12 +1,13 @@
 class CommandHandler
-  attr_reader :command, :messages, :client, :setter, :parser
+  attr_reader :command, :messages, :client, :setter, :parser, :server
 
-  def initialize(command, messages, client, setter, parser)
+  def initialize(command, messages, client, setter, parser, server)
     @command = command
     @messages = messages
     @client = client
     @setter = setter
     @parser = parser
+    @server = server
   end
 
   def handle
@@ -40,6 +41,16 @@ class CommandHandler
         end
       else
         client.write(parser.encode("", "bulk_string"))
+      end
+    when "config"
+      sub_command = messages[0].downcase
+      if sub_command == "get"
+        key = messages[1].downcase
+        if key == "dbfilename"
+          client.write(parser.encode(["dbfilename", server.dbfilename], "array"))
+        elsif key == "dir"
+          client.write(parser.encode(["dir", server.dir], "array"))
+        end
       end
     end
   end
