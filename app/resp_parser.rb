@@ -61,8 +61,13 @@ class RESPParser
   
   def encode(data, type)
     case type
+    when "simple_string"
+      "+#{data}\r\n"
+    when "simple_error"
+      "-"#{data}\r\n"
     when "bulk_string"
-      "$#{data.length}\r\n#{data}\r\n"
+      data_length = data.length.zero? ? -1 : data.length
+      "$#{data_length}\r\n#{data}\r\n"
     when "integer"
       ":#{data}\r\n"
     when "double"

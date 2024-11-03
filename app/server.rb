@@ -1,11 +1,13 @@
 require "socket"
 require_relative "resp_parser"
+require_relative "command_handler"
 
 class RedisServer
-  attr_reader :server, :clients
+  attr_reader :server, :clients, :setter
   def initialize(port)
     @server = TCPServer.new(port)
     @clients = []
+    @setter = Hash.new
   end
 
   def listen
@@ -35,13 +37,10 @@ class RedisServer
     data = client.readpartial(1024)
     parser = RESPParser.new(data)
     parsed_data = parser.parse
-    command, message = parsed_data[:data]
-    case command
-    when "PING"
-      client.write("+PONG\r\n")
-    when "ECHO"
-      client.write(parser.encode(message, "bulk_string"))
-    end
+    command, *messages = parsed_data[:data]
+    command_handler = CommandHandler.new(command, messages, client, setter, parser)
+
+    command_handler.handle
   rescue StandardError
   end
 end
