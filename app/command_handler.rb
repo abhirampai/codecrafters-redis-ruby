@@ -52,6 +52,32 @@ class CommandHandler
           client.write(parser.encode(["dir", server.dir], "array"))
         end
       end
+    when "keys"
+      sub_command = messages[0].downcase
+      if sub_command == "*"
+        file = File.open(File.join(server.dir, server.dbfilename), "rb")
+        file.seek(9) # skip header section
+        loop do
+          opCode = file.read(1)
+          case opCode.unpack1("H*").to_sym
+          when :fb
+            size_of_hash_table = file.read(1).unpack1("C*")
+            size_of_expiry_table = file.read(1).unpack1("C*")
+            size_of_hash_table.times do |_|
+              value_encoding_type = file.read(1).unpack1("C*") # skip for now
+              size_of_key = file.read(1).unpack1("C*")
+              key = file.read(size_of_key)
+              size_of_value = file.read(1).unpack1("C*")
+              value = file.read(size_of_value)
+              @setter[key] = { data: value, created_at: Time.now, ttl: -1 }
+            end
+          when :ff
+            break
+          end 
+        end
+        client.write(parser.encode(@setter.keys, "array"))
+        file.close
+      end
     end
   end
 end
