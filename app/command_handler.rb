@@ -33,6 +33,7 @@ class CommandHandler
           client.write(parser.encode(setter[key][:data], "bulk_string"))
         else
           ellapsed_time_in_milliseconds = ((Time.now - setter[key][:created_at]) * 1000).to_f
+          p ellapsed_time_in_milliseconds
           if ellapsed_time_in_milliseconds < setter[key][:ttl]
             client.write(parser.encode(setter[key][:data], "bulk_string"))
           else

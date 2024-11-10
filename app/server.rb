@@ -9,7 +9,7 @@ class RedisServer
     @clients = []
     @setter = Hash.new
     parse_arguments(arguments)
-    populate_setter if dir && dbfilename
+    populate_setter_with_rdb_file_data if dir && dbfilename
   end
 
   def listen
@@ -30,9 +30,10 @@ class RedisServer
     end
   end
   
-  def populate_setter
+  def populate_setter_with_rdb_file_data
     return unless File.file?(File.join(dir, dbfilename))
 
+    current_unix_time_stamp = Time.now.to_i
     file = File.open(File.join(dir, dbfilename), "rb")
     file.seek(9) # skip header section
     loop do
@@ -41,8 +42,27 @@ class RedisServer
       when :fb
         size_of_hash_table = file.read(1).unpack1("C*")
         size_of_expiry_table = file.read(1).unpack1("C*")
-        size_of_hash_table.times do |_|
-          value_encoding_type = file.read(1).unpack1("C*") # skip for now
+        if size_of_expiry_table > 0
+          size_of_expiry_table.times do |_|
+            type_of_expiry_time = file.read(1).unpack1("H*").to_sym
+            case type_of_expiry_time
+            when :fc
+              expiry_time = file.read(8).unpack1("V")
+            when :fd
+              expiry_time = file.read(4).unpack1("V") * 1000
+            end
+            value_encoding_type_or_expiry_time = file.read(1).unpack1("C*") # skip for now
+            size_of_key = file.read(1).unpack1("C*")
+            key = file.read(size_of_key)
+            size_of_value = file.read(1).unpack1("C*")
+            value = file.read(size_of_value)
+            if current_unix_time_stamp < expiry_time
+              @setter[key] = { data: value, created_at: Time.now, ttl: expiry_time }
+            end
+          end
+        end
+        (size_of_hash_table - size_of_expiry_table).times do |_|
+          value_encoding_type_or_expiry_time = file.read(1).unpack1("C*") # skip for now
           size_of_key = file.read(1).unpack1("C*")
           key = file.read(size_of_key)
           size_of_value = file.read(1).unpack1("C*")
@@ -53,6 +73,7 @@ class RedisServer
         break
       end 
     end
+    p @setter
     file.close
   end
 
