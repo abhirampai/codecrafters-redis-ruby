@@ -1,4 +1,5 @@
 require "securerandom"
+require_relative "resp_parser"
 
 class CommandHandler
   attr_reader :command, :messages, :client, :setter, :parser, :server
@@ -72,6 +73,10 @@ class CommandHandler
       client.write(parser.encode("OK", "simple_string"))
     when "psync"
       client.write(parser.encode("FULLRESYNC #{server.master_replid} 0", "simple_string"))
+      empty_rdb_file = File.open("app/empty_rdb.rdb", "rb")
+      content = [empty_rdb_file.read(1024).strip].pack("H*")
+      client.write("$#{content.size}\r\n")
+      client.write(content)
     end
   end
 end
