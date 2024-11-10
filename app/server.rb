@@ -4,11 +4,11 @@ require_relative "command_handler"
 
 class RedisServer
   attr_reader :server, :clients, :setter, :dir, :dbfilename
-  def initialize(port, arguments)
-    @server = TCPServer.new(port)
+  def initialize(arguments)
     @clients = []
     @setter = Hash.new
     parse_arguments(arguments)
+    @server = TCPServer.new(6379) if !server
     populate_setter_with_rdb_file_data if dir && dbfilename
   end
 
@@ -26,6 +26,8 @@ class RedisServer
         @dir = arguments[arg_index + 1]
       elsif argument == "--dbfilename"
         @dbfilename = arguments[arg_index + 1]
+      elsif argument == "--port"
+        @server = TCPServer.new(arguments[arg_index + 1])
       end
     end
   end
@@ -104,4 +106,4 @@ class RedisServer
   end
 end
 
-redis_cli = RedisServer.new(6379, ARGV[0..]).listen
+redis_cli = RedisServer.new(ARGV[0..]).listen
