@@ -9,6 +9,7 @@ class RedisServer
     @clients = []
     @setter = Hash.new
     parse_arguments(arguments)
+    populate_setter if dir && dbfilename
   end
 
   def listen
@@ -27,6 +28,32 @@ class RedisServer
         @dbfilename = arguments[arg_index + 1]
       end
     end
+  end
+  
+  def populate_setter
+    return unless File.file?(File.join(dir, dbfilename))
+
+    file = File.open(File.join(dir, dbfilename), "rb")
+    file.seek(9) # skip header section
+    loop do
+      opCode = file.read(1)
+      case opCode.unpack1("H*").to_sym
+      when :fb
+        size_of_hash_table = file.read(1).unpack1("C*")
+        size_of_expiry_table = file.read(1).unpack1("C*")
+        size_of_hash_table.times do |_|
+          value_encoding_type = file.read(1).unpack1("C*") # skip for now
+          size_of_key = file.read(1).unpack1("C*")
+          key = file.read(size_of_key)
+          size_of_value = file.read(1).unpack1("C*")
+          value = file.read(size_of_value)
+          @setter[key] = { data: value, created_at: Time.now, ttl: -1 }
+        end
+      when :ff
+        break
+      end 
+    end
+    file.close
   end
 
   def accept_incoming_connections
