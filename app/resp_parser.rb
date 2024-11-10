@@ -11,49 +11,49 @@ class RESPParser
     case resp[current_index]
     when "+"
       @current_index += 1
-      @result = { data: parse_simple_string, type: "simple_string" }
+      @result = { data: parse_simple_string, type: "simple_string", current_index: current_index }
     when "-"
       @current_index += 1
-      @result = { data: parse_error, type: "simple_error" }
+      @result = { data: parse_error, type: "simple_error", current_index: current_index }
     when ":"
       @current_index += 1
-      @result = { data: parse_integer, type: "integer" }
+      @result = { data: parse_integer, type: "integer", current_index: current_index }
     when "$"
       @current_index += 1
-      @result = { data: parse_bulk_string, type: "bulk_string" }
+      @result = { data: parse_bulk_string, type: "bulk_string", current_index: current_index }
     when "*"
       @current_index += 1
-      @result = { data: parse_array, type: "array" }
+      @result = { data: parse_array, type: "array", current_index: current_index }
     when "_"
       @current_index += 3
-      @result = { data: nil, type: "nil" }
+      @result = { data: nil, type: "nil", current_index: current_index }
     when "#"
       @current_index += 1
-      @result = { data: parse_boolean, type: "boolean" }
+      @result = { data: parse_boolean, type: "boolean", current_index: current_index }
     when ","
       @current_index += 1
-      @result = { data: parse_doubles, type: "double" }
+      @result = { data: parse_doubles, type: "double", current_index: current_index }
     when "("
       @current_index += 1
-      @result = { data: parse_big_number, type: "big_number" }
+      @result = { data: parse_big_number, type: "big_number", current_index: current_index }
     when "!"
       @current_index += 1
-      @result = { data: parse_bulk_errors, type: "bulk_errors" }
+      @result = { data: parse_bulk_errors, type: "bulk_errors", current_index: current_index }
     when "="
       @current_index += 1
-      @result = { data: parse_verbatim_string, type: "verbatim_string" }
+      @result = { data: parse_verbatim_string, type: "verbatim_string", current_index: current_index }
     when "%"
       @current_index += 1
-      @result = { data: parse_map, type: "map" }
+      @result = { data: parse_map, type: "map", current_index: current_index }
     when "|"
       @current_index += 1
-      @result = { data: parse_map, type: "attribute" }
+      @result = { data: parse_map, type: "attribute", current_index: current_index }
     when "~"
       @current_index += 1
-      @result = { data: Set.new(parse_array), type: "set" }
+      @result = { data: Set.new(parse_array), type: "set", current_index: current_index }
     when ">"
       @current_index += 1
-      @result = { data: parse_array, type: "push" }
+      @result = { data: parse_array, type: "push", current_index: current_index }
     else
       p "Unknown parse type refer to redis protocol (https://redis.io/docs/latest/develop/reference/protocol-spec)"
     end

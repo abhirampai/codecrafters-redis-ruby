@@ -27,6 +27,8 @@ class CommandHandler
       if messages.length > 2
         @setter[messages[0]][:ttl] = messages[3].to_i if messages[2].downcase == "px"
       end
+      
+      return if server.replica != false
 
       client.write(parser.encode("OK", "simple_string"))
       server.send_buffer_message(["SET", messages[0], messages[1]])
