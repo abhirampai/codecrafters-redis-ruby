@@ -3,13 +3,13 @@ require_relative "resp_parser"
 require_relative "command_handler"
 
 class RedisServer
-  attr_reader :server, :clients, :setter, :dir, :dbfilename, :replica
+  attr_reader :server, :clients, :setter, :dir, :dbfilename, :replica, :port
   def initialize(arguments)
     @clients = []
     @setter = Hash.new
     @replica = false
     parse_arguments(arguments)
-    @server = TCPServer.new(6379) if !server
+    set_default_port if !server
     populate_setter_with_rdb_file_data if dir && dbfilename
     send_handshake_message if replica
   end
@@ -22,6 +22,11 @@ class RedisServer
 
   private
 
+  def set_default_port
+    @port = 6379
+    @server = TCPServer.new(port)
+  end
+
   def parse_arguments(arguments)
     arguments.each_with_index do |argument, arg_index|
       if argument == "--dir"
@@ -29,7 +34,8 @@ class RedisServer
       elsif argument == "--dbfilename"
         @dbfilename = arguments[arg_index + 1]
       elsif argument == "--port"
-        @server = TCPServer.new(arguments[arg_index + 1])
+        @port = arguments[arg_index + 1]
+        @server = TCPServer.new(port)
       elsif argument == "--replicaof"
         host, port = arguments[arg_index + 1].split(" ")
         @replica = { host: host, port: port }
@@ -114,6 +120,11 @@ class RedisServer
     socket = TCPSocket.open(replica[:host], replica[:port])
     parser = RESPParser.new("")
     socket.write(parser.encode(["PING"], "array"))
+    socket.readpartial(1024)
+    socket.write(parser.encode(["REPLCONF", "listening-port", port], "array"))
+    socket.readpartial(1024)
+    socket.write(parser.encode(["REPLCONF", "capa", "psync2"], "array"))
+    socket.readpartial(1024)
   end
 end
 
