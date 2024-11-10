@@ -4,11 +4,13 @@ require_relative "command_handler"
 require_relative "tcp_connection"
 
 class RedisServer
-  attr_reader :server, :clients, :setter, :dir, :dbfilename, :replica, :port
+  attr_reader :server, :clients, :setter, :dir, :dbfilename, :replica, :port, :master_replid
+
   def initialize(arguments)
     @clients = []
     @setter = Hash.new
     @replica = false
+    @master_replid = SecureRandom.alphanumeric(40)
     parse_arguments(arguments)
     set_default_port if !server
     populate_setter_with_rdb_file_data if dir && dbfilename

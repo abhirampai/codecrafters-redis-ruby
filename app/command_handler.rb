@@ -64,13 +64,14 @@ class CommandHandler
       sub_command = messages[0].downcase
       if sub_command == "replication"
         role = server.replica ? "slave" : "master"
-        master_replid = SecureRandom.alphanumeric(40)
         master_repl_offset = 0
-        message = "role:#{role}\nmaster_replid:#{master_replid}\nmaster_repl_offset:#{master_repl_offset}"
+        message = "role:#{role}\nmaster_replid:#{server.master_replid}\nmaster_repl_offset:#{master_repl_offset}"
         client.write(parser.encode(message, "bulk_string"))
       end
     when "replconf"
       client.write(parser.encode("OK", "simple_string"))
+    when "psync"
+      client.write(parser.encode("FULLRESYNC #{server.master_replid} 0", "simple_string"))
     end
   end
 end
