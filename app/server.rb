@@ -11,6 +11,7 @@ class RedisServer
     parse_arguments(arguments)
     @server = TCPServer.new(6379) if !server
     populate_setter_with_rdb_file_data if dir && dbfilename
+    send_handshake_message if replica
   end
 
   def listen
@@ -107,6 +108,12 @@ class RedisServer
 
     command_handler.handle
   rescue StandardError
+  end
+
+  def send_handshake_message
+    socket = TCPSocket.open(replica[:host], replica[:port])
+    parser = RESPParser.new("")
+    socket.write(parser.encode(["PING"], "array"))
   end
 end
 
