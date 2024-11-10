@@ -58,6 +58,11 @@ class CommandHandler
       if sub_command == "*"
         client.write(parser.encode(@setter.keys, "array"))
       end
+    when "info"
+      sub_command = messages[0].downcase
+      if sub_command == "replication"
+        client.write(parser.encode("role:master", "bulk_string"))
+      end
     end
   end
 end
