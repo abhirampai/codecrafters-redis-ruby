@@ -125,6 +125,8 @@ class RedisServer
     socket.readpartial(1024)
     socket.write(parser.encode(["REPLCONF", "capa", "psync2"], "array"))
     socket.readpartial(1024)
+    socket.write(parser.encode(["PSYNC", "?", "-1"], "array"))
+    socket.readpartial(1024)
   end
 end
 
