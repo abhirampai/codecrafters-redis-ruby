@@ -69,6 +69,8 @@ class CommandHandler
         message = "role:#{role}\nmaster_replid:#{master_replid}\nmaster_repl_offset:#{master_repl_offset}"
         client.write(parser.encode(message, "bulk_string"))
       end
+    when "replconf"
+      client.write(parser.encode("OK", "simple_string"))
     end
   end
 end
