@@ -1,6 +1,7 @@
 require "socket"
 require_relative "resp_parser"
 require_relative "command_handler"
+require_relative "tcp_connection"
 
 class RedisServer
   attr_reader :server, :clients, :setter, :dir, :dbfilename, :replica, :port
@@ -86,7 +87,6 @@ class RedisServer
         break
       end 
     end
-    p @setter
     file.close
   end
 
@@ -117,16 +117,7 @@ class RedisServer
   end
 
   def send_handshake_message
-    socket = TCPSocket.open(replica[:host], replica[:port])
-    parser = RESPParser.new("")
-    socket.write(parser.encode(["PING"], "array"))
-    socket.readpartial(1024)
-    socket.write(parser.encode(["REPLCONF", "listening-port", port], "array"))
-    socket.readpartial(1024)
-    socket.write(parser.encode(["REPLCONF", "capa", "psync2"], "array"))
-    socket.readpartial(1024)
-    socket.write(parser.encode(["PSYNC", "?", "-1"], "array"))
-    socket.readpartial(1024)
+    TcpConnection.send_handshake(replica[:host], replica[:port], self)
   end
 end
 
