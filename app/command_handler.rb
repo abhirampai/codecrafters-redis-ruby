@@ -1,3 +1,5 @@
+require "securerandom"
+
 class CommandHandler
   attr_reader :command, :messages, :client, :setter, :parser, :server
 
@@ -61,13 +63,13 @@ class CommandHandler
     when "info"
       sub_command = messages[0].downcase
       if sub_command == "replication"
-        p server.replica
-        if server.replica
-          client.write(parser.encode("role:slave", "bulk_string"))
-        else
-          client.write(parser.encode("role:master", "bulk_string"))
-        end
+        role = server.replica ? "slave" : "master"
+        master_replid = SecureRandom.alphanumeric(40)
+        master_repl_offset = 0
+        message = "role:#{role}\nmaster_replid:#{master_replid}\nmaster_repl_offset:#{master_repl_offset}"
+        client.write(parser.encode(message, "bulk_string"))
       end
     end
   end
 end
+
