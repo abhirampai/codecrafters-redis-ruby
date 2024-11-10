@@ -4,12 +4,14 @@ require_relative "command_handler"
 require_relative "tcp_connection"
 
 class RedisServer
-  attr_reader :server, :clients, :setter, :dir, :dbfilename, :replica, :port, :master_replid
+  attr_reader :server, :clients, :setter, :dir, :dbfilename, :port, :replica, :master_replid
+  attr_accessor :replica_buffer_commands, :replicas
 
   def initialize(arguments)
     @clients = []
     @setter = Hash.new
     @replica = false
+    @replicas = []
     @master_replid = SecureRandom.alphanumeric(40)
     parse_arguments(arguments)
     set_default_port if !server
@@ -22,7 +24,15 @@ class RedisServer
       accept_incoming_connections
     end
   end
-
+  
+  def send_buffer_message(commands)
+    parser = RESPParser.new("")
+    replicas.each do |server_replica|
+      p "Sending #{commands} to replica #{server_replica}"
+      server_replica.write(parser.encode(commands, "array"))
+    end
+  end
+  
   private
 
   def set_default_port
