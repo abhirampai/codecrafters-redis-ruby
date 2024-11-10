@@ -61,7 +61,12 @@ class CommandHandler
     when "info"
       sub_command = messages[0].downcase
       if sub_command == "replication"
-        client.write(parser.encode("role:master", "bulk_string"))
+        p server.replica
+        if server.replica
+          client.write(parser.encode("role:slave", "bulk_string"))
+        else
+          client.write(parser.encode("role:master", "bulk_string"))
+        end
       end
     end
   end
