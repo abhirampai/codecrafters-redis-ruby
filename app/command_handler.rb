@@ -75,9 +75,12 @@ class CommandHandler
       sub_command = messages[0].downcase
       if sub_command == "listening-port"
         server.replicas.concat([client])
+        client.write(parser.encode("OK", "simple_string"))
+      elsif sub_command == "getack"
+        client.write(parser.encode(["REPLCONF", "ACK","0"], "array"))
+      else
+        client.write(parser.encode("OK", "simple_string"))
       end
-
-      client.write(parser.encode("OK", "simple_string"))
     when "psync"
       client.write(parser.encode("FULLRESYNC #{server.master_replid} 0", "simple_string"))
       empty_rdb_file = File.open("app/empty_rdb.rdb", "rb")
