@@ -2,21 +2,23 @@ require "securerandom"
 require_relative "resp_parser"
 
 class CommandHandler
-  attr_reader :command, :messages, :client, :setter, :parser, :server
+  attr_reader :command, :messages, :client, :setter, :parser, :data_size, :server
 
-  def initialize(command, messages, client, setter, parser, server)
+  def initialize(command, messages, client, setter, parser, data_size, server)
     @command = command
     @messages = messages
     @client = client
     @setter = setter
     @parser = parser
+    @data_size = data_size
     @server = server
   end
 
   def handle
+    p "Handling command :=> #{command}"
     case command.downcase
     when "ping"
-      client.write("+PONG\r\n")
+      client.write("+PONG\r\n") if server.replica == false
     when "echo"
       messages.each do |message|
         client.write(parser.encode(message, "bulk_string"))
@@ -28,10 +30,10 @@ class CommandHandler
         @setter[messages[0]][:ttl] = messages[3].to_i if messages[2].downcase == "px"
       end
       
-      return if server.replica != false
-
-      client.write(parser.encode("OK", "simple_string"))
-      server.send_buffer_message(["SET", messages[0], messages[1]])
+      if server.replica == false
+        client.write(parser.encode("OK", "simple_string"))
+        server.send_buffer_message(["SET", messages[0], messages[1]])
+      end
     when "get"
       key = messages[0]
       if setter.has_key?(key)
@@ -77,7 +79,7 @@ class CommandHandler
         server.replicas.concat([client])
         client.write(parser.encode("OK", "simple_string"))
       elsif sub_command == "getack"
-        client.write(parser.encode(["REPLCONF", "ACK","0"], "array"))
+        client.write(parser.encode(["REPLCONF", "ACK", server.commands_processed_in_bytes.to_s], "array"))
       else
         client.write(parser.encode("OK", "simple_string"))
       end
@@ -88,6 +90,12 @@ class CommandHandler
       client.write("$#{content.size}\r\n")
       client.write(content)
     end
+    update_commands_processed
+  end
+  
+  def update_commands_processed
+    server.commands_processed_in_bytes += data_size if server.replica != false 
   end
 end
+
 

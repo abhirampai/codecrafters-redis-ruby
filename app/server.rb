@@ -5,7 +5,7 @@ require_relative "tcp_connection"
 
 class RedisServer
   attr_reader :server, :clients, :setter, :dir, :dbfilename, :port, :replica, :master_replid
-  attr_accessor :replica_buffer_commands, :replicas, :sockets
+  attr_accessor :replica_buffer_commands, :replicas, :sockets, :commands_processed_in_bytes
 
   def initialize(arguments)
     @clients = []
@@ -14,6 +14,7 @@ class RedisServer
     @replicas = []
     @master_replid = SecureRandom.alphanumeric(40)
     @sockets = []
+    @commands_processed_in_bytes = 0
     parse_arguments(arguments)
     set_default_port if !server
     populate_setter_with_rdb_file_data if dir && dbfilename
@@ -126,7 +127,9 @@ class RedisServer
         parser = RESPParser.new(data[current_index..])
         parsed_data = parser.parse
         command, *messages = parsed_data[:data]
-        command_handler = CommandHandler.new(command, messages, client, setter, parser, self)
+        length_of_data = data[current_index...current_index + parsed_data[:current_index] - 2].size
+        p "length_of_data #{length_of_data}"
+        command_handler = CommandHandler.new(command, messages, client, setter, parser, length_of_data, self)
         command_handler.handle
         current_index += parsed_data[:current_index] - 2
       end
