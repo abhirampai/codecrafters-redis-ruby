@@ -89,6 +89,9 @@ class CommandHandler
       content = [empty_rdb_file.read(1024).strip].pack("H*")
       client.write("$#{content.size}\r\n")
       client.write(content)
+    when "wait"
+      p "Server socket length #{server.sockets.length}"
+      client.write(parser.encode(server.sockets.length, "integer"))
     end
     update_commands_processed
   end
