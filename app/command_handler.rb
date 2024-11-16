@@ -90,8 +90,7 @@ class CommandHandler
       client.write("$#{content.size}\r\n")
       client.write(content)
     when "wait"
-      p "Server socket length #{server.sockets.length}"
-      client.write(parser.encode(server.sockets.length, "integer"))
+      client.write(parser.encode(server.replicas.length, "integer"))
     end
     update_commands_processed
   end
