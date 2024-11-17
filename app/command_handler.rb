@@ -117,8 +117,21 @@ class CommandHandler
       fields.each_slice(2) do |key, value|
         hash[key] = value
       end
-      setter[key] = { data: hash, created_at: Time.now, ttl: -1, type: "stream" }
-      p setter[key]
+      if setter.has_key?(key)
+        data = setter[key][:data].merge(hash)
+        milliseconds, sequence = hash[:id].split("-").map(&:to_i)
+        previous_milliseconds, previous_sequence = setter[key][:data][:id].split("-").map(&:to_i)
+        return unless valid_data(milliseconds, sequence, previous_milliseconds, previous_sequence)
+
+        setter[key] = { data: data, created_at: Time.now, ttl: -1, type: "stream" }
+      else
+        milliseconds, sequence = hash[:id].split("-").map(&:to_i)
+        if milliseconds.zero? && sequence.zero?
+          return raise_stream_error("ERR The ID specified in XADD must be greater than 0-0")
+        end
+
+        setter[key] = { data: hash, created_at: Time.now, ttl: -1, type: "stream" }
+      end
       client.write(parser.encode(id, "bulk_string"))
     end
     update_commands_processed
@@ -126,6 +139,22 @@ class CommandHandler
   
   def update_commands_processed
     server.commands_processed_in_bytes += data_size if server.replica != false 
+  end
+  
+  def raise_stream_error(message)
+    client.write(parser.encode(message, "simple_error"))
+  end
+  
+  def valid_data(milliseconds, sequence, previous_milliseconds = 0, previous_sequence = 0)
+    if milliseconds.zero? && sequence.zero?
+      raise_stream_error("ERR The ID specified in XADD must be greater than 0-0")
+      return false
+    elsif previous_sequence >= sequence || previous_milliseconds > milliseconds
+      raise_stream_error("ERR The ID specified in XADD is equal or smaller than the target stream top item")
+      return false
+    else
+      return true
+    end
   end
 end
 

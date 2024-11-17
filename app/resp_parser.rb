@@ -64,7 +64,7 @@ class RESPParser
     when "simple_string"
       "+#{data}\r\n"
     when "simple_error"
-      "-"#{data}\r\n"
+      "-#{data}\r\n"
     when "bulk_string"
       return "$-1\r\n" if data.length.zero?
 
