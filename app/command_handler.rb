@@ -134,6 +134,30 @@ class CommandHandler
         setter[key] = { data: [hash], created_at: Time.now, ttl: -1, type: "stream" }
       end
       client.write(parser.encode(id, "bulk_string"))
+    when "xrange"
+      key = messages[0]
+      start_id = messages[1]
+      end_id = messages[2]
+      copy_item = false
+      data_range = []
+      setter[key][:data].each do |item|
+        if item[:id].include?(start_id)
+          copy_item = true
+          data_range << item
+          next
+        end
+        if item[:id].include?(end_id)
+          data_range << item
+          break
+        end
+        if copy_item
+          data_range << item
+        end
+      end
+      result = data_range.map do |item|
+        [item[:id], *item.except(:id).entries]
+      end
+      client.write(parser.encode(result, "array"))
     end
     update_commands_processed
   end
@@ -147,7 +171,6 @@ class CommandHandler
   end
   
   def valid_data(milliseconds, sequence, previous_milliseconds = 0, previous_sequence = 0)
-    p "milliseconds: #{milliseconds}, sequence: #{sequence}, previous_milliseconds: #{previous_milliseconds}, previous_sequence: #{previous_sequence}"
     if milliseconds.zero? && sequence.zero?
       raise_stream_error("ERR The ID specified in XADD must be greater than 0-0")
       return false

@@ -74,7 +74,7 @@ class RESPParser
     when "double"
       ",#{data}\r\n"
     when "array"
-      "*#{data.length}\r\n#{data.map { |d| encode(d, "bulk_string") }.join("")}"
+      "*#{data.length}\r\n#{data.map { |d| d.is_a?(Array) ? encode(d, "array") : encode(d, "bulk_string") }.join("")}"
     when "set"
       "~#{data.length}\r\n#{data.map { |d| encode(d, "bulk_string") }.join("")}"
     when "map"
