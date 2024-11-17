@@ -15,6 +15,7 @@ class CommandHandler
   end
 
   def handle
+    p "handle command #{command} with messages #{messages}"
     case command.downcase
     when "ping"
       client.write("+PONG\r\n") if server.replica == false
@@ -166,13 +167,26 @@ class CommandHandler
       end
       client.write(parser.encode(result, "array"))
     when "xread"
-      number_of_streams = messages[1..].length / 2
+      subcommand = messages[0]
+      if subcommand == "block"
+        block_in_ms = Time.now + messages[1].to_i / 1000
+        while Time.now < block_in_ms
+          sleep(0.1)
+        end
+      end
+      start_index = messages.index("streams") + 1
+      number_of_streams = messages[start_index..].length / 2
       response = []
       number_of_streams.times do |n|
-        response << process_xread_command(n + 1, number_of_streams)
+        result = process_xread_command(n + start_index, number_of_streams)
+        response << result unless result.empty?
       end
 
-      client.write(parser.encode(response, "array"))
+      if response.empty?
+        client.write(parser.encode("", "bulk_string"))
+      else
+        client.write(parser.encode(response, "array"))
+      end
     end
     update_commands_processed
   end
@@ -228,29 +242,33 @@ class CommandHandler
   def process_xread_command(index, offset)
     key = messages[index]
     stream_id = messages[index + offset]
-    end_id = setter[key][:data].last[:id]
+    return [] if !setter[key]
+
     data_range = []
+    copy_item = false
+
     setter[key][:data].each do |item|
-      if item[:id] >= stream_id
+      if item[:id] > stream_id
         data_range << item
         copy_item = true
         next
       end
-      
-      if item[:id].include?(end_id)
-        data_range << item
-        break
-      end
+
       if copy_item
         data_range << item
       end
     end
+
     result = [key]
     data_range.each do |item|
       result.append([[item[:id], *item.except(:id).entries]])
     end
-    
-    return result
+
+    if result.length > 1
+      return result
+    else
+      return []
+    end
   end
 end
 
