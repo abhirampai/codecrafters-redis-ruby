@@ -15,7 +15,6 @@ class CommandHandler
   end
 
   def handle
-    p "Handling command :=> #{command}"
     case command.downcase
     when "ping"
       client.write("+PONG\r\n") if server.replica == false
@@ -79,7 +78,10 @@ class CommandHandler
         server.replicas.concat([client])
         client.write(parser.encode("OK", "simple_string"))
       elsif sub_command == "getack"
+        p "inside getack"
         client.write(parser.encode(["REPLCONF", "ACK", server.commands_processed_in_bytes.to_s], "array"))
+      elsif sub_command == "ack"
+        server.update_replicas_ack(false) if server.replica == false
       else
         client.write(parser.encode("OK", "simple_string"))
       end
@@ -90,7 +92,17 @@ class CommandHandler
       client.write("$#{content.size}\r\n")
       client.write(content)
     when "wait"
-      client.write(parser.encode(server.replicas.length, "integer"))
+      client.write(parser.encode(0, "integer")) if server.replicas.length.zero?
+      wait_time = Time.now + messages[1].to_f / 1000
+      if server.replicas.length.positive?
+        server.send_buffer_message(["REPLCONF", "GETACK", "*"])
+      end
+      while server.replicas_ack <= messages[0].to_i && Time.now < wait_time
+        sleep(0.1)
+      end
+      message = server.replicas_ack.positive? ? server.replicas_ack : server.replicas.length
+      server.update_replicas_ack(true, 0)
+      client.write(parser.encode(message, "integer"))
     end
     update_commands_processed
   end
