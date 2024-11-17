@@ -165,6 +165,32 @@ class CommandHandler
         [item[:id], *item.except(:id).entries]
       end
       client.write(parser.encode(result, "array"))
+    when "xread"
+      key = messages[1]
+      stream_id = messages[2]
+      end_id = setter[key][:data].last[:id]
+      data_range = []
+      setter[key][:data].each do |item|
+        if item[:id] >= stream_id
+          data_range << item
+          copy_item = true
+          next
+        end
+        
+        if item[:id].include?(end_id)
+          data_range << item
+          break
+        end
+        if copy_item
+          data_range << item
+        end
+      end
+      result = [[key]]
+      data_range.each do |item|
+        result.first.append([[item[:id], *item.except(:id).entries]])
+      end
+      p result
+      client.write(parser.encode(result, "array"))
     end
     update_commands_processed
   end
