@@ -143,6 +143,10 @@ class CommandHandler
       if start_id == "-"
         start_id = setter[key][:data].first[:id]
       end
+      
+      if end_id == "+"
+        end_id = setter[key][:data].last[:id]
+      end
       setter[key][:data].each do |item|
         if item[:id].include?(start_id)
           copy_item = true
