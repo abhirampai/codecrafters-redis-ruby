@@ -166,31 +166,13 @@ class CommandHandler
       end
       client.write(parser.encode(result, "array"))
     when "xread"
-      key = messages[1]
-      stream_id = messages[2]
-      end_id = setter[key][:data].last[:id]
-      data_range = []
-      setter[key][:data].each do |item|
-        if item[:id] >= stream_id
-          data_range << item
-          copy_item = true
-          next
-        end
-        
-        if item[:id].include?(end_id)
-          data_range << item
-          break
-        end
-        if copy_item
-          data_range << item
-        end
+      number_of_streams = messages[1..].length / 2
+      response = []
+      number_of_streams.times do |n|
+        response << process_xread_command(n + 1, number_of_streams)
       end
-      result = [[key]]
-      data_range.each do |item|
-        result.first.append([[item[:id], *item.except(:id).entries]])
-      end
-      p result
-      client.write(parser.encode(result, "array"))
+
+      client.write(parser.encode(response, "array"))
     end
     update_commands_processed
   end
@@ -241,6 +223,34 @@ class CommandHandler
     end
 
     return "#{timestamp}-#{sequence}"
+  end
+  
+  def process_xread_command(index, offset)
+    key = messages[index]
+    stream_id = messages[index + offset]
+    end_id = setter[key][:data].last[:id]
+    data_range = []
+    setter[key][:data].each do |item|
+      if item[:id] >= stream_id
+        data_range << item
+        copy_item = true
+        next
+      end
+      
+      if item[:id].include?(end_id)
+        data_range << item
+        break
+      end
+      if copy_item
+        data_range << item
+      end
+    end
+    result = [key]
+    data_range.each do |item|
+      result.append([[item[:id], *item.except(:id).entries]])
+    end
+    
+    return result
   end
 end
 
