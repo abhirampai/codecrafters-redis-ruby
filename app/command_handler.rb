@@ -23,7 +23,7 @@ class CommandHandler
         client.write(parser.encode(message, "bulk_string"))
       end
     when "set"
-      @setter[messages[0]] = { data: messages[1], created_at: Time.now, ttl: -1 }
+      @setter[messages[0]] = { data: messages[1], created_at: Time.now, ttl: -1, type: "string" }
 
       if messages.length > 2
         @setter[messages[0]][:ttl] = messages[3].to_i if messages[2].downcase == "px"
@@ -105,10 +105,21 @@ class CommandHandler
       client.write(parser.encode(message, "integer"))
     when "type"
       if setter.has_key?(messages[0])
-        client.write(parser.encode("string", "simple_string"))
+        client.write(parser.encode(setter[messages[0]][:type], "simple_string"))
       else
        client.write(parser.encode("none", "simple_string"))
       end
+    when "xadd"
+      key = messages[0]
+      id = messages[1]
+      hash = { id: id }
+      fields = messages[2..]
+      fields.each_slice(2) do |key, value|
+        hash[key] = value
+      end
+      setter[key] = { data: hash, created_at: Time.now, ttl: -1, type: "stream" }
+      p setter[key]
+      client.write(parser.encode(id, "bulk_string"))
     end
     update_commands_processed
   end
