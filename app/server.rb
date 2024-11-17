@@ -133,21 +133,30 @@ class RedisServer
     data = client.readpartial(1024)
     current_index = 0
     if data
-      while current_index < data.size
-        @command_mutex.synchronize do
-          parser = RESPParser.new(data[current_index..])
-          parsed_data = parser.parse
-          command, *messages = parsed_data[:data]
-          length_of_data = data[current_index...current_index + parsed_data[:current_index] - 2].size
-          Thread.new(command, messages, client, setter, parser, length_of_data, self) do |command, messages, client, setter, parser, length_of_data, self_reference|
-            command_handler = CommandHandler.new(command, messages, client, setter, parser, length_of_data, self_reference)
-            command_handler.handle
-          end
-          current_index += parsed_data[:current_index] - 2
-        end
+      if (data.include?("+FULLRESYNC") || data.include?("REDIS0011")) && data.include?("REPLCONF")
+        current_index = data.index("REPLCONF") - 8
+      elsif data.include?("+FULLRESYNC") || data.include?("REDIS0011")
+        return
       end
+      handle_data_chunks(data, current_index, client)
     end
   rescue StandardError
+  end
+  
+  def handle_data_chunks(data, current_index, client)
+    while current_index < data.size
+      @command_mutex.synchronize do
+        parser = RESPParser.new(data[current_index..])
+        parsed_data = parser.parse
+        command, *messages = parsed_data[:data]
+        length_of_data = data[current_index...current_index + parsed_data[:current_index] - 2].size
+        Thread.new(command, messages, client, setter, parser, length_of_data, self) do |command, messages, client, setter, parser, length_of_data, self_reference|
+          command_handler = CommandHandler.new(command, messages, client, setter, parser, length_of_data, self_reference)
+          command_handler.handle
+        end
+        current_index += parsed_data[:current_index] - 2
+      end
+    end
   end
 
   def send_handshake_message

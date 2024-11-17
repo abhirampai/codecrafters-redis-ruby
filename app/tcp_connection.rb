@@ -36,8 +36,6 @@ class TcpConnection
 
     def send_psync_message
       socket.write(parser.encode(["PSYNC", "?", "-1"], "array"))
-      socket.readpartial(1024)
-      socket.readpartial(1024)
     end
   end
 end
