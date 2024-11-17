@@ -111,16 +111,17 @@ class CommandHandler
       end
     when "xadd"
       key = messages[0]
-      id = messages[1]
+      id = auto_generate_id(key, messages[1])
+
       hash = { id: id }
       fields = messages[2..]
       fields.each_slice(2) do |key, value|
         hash[key] = value
       end
       if setter.has_key?(key)
-        data = setter[key][:data].merge(hash)
+        previous_milliseconds, previous_sequence = setter[key][:data].last[:id].split("-").map(&:to_i)
+        data = setter[key][:data].append(hash)
         milliseconds, sequence = hash[:id].split("-").map(&:to_i)
-        previous_milliseconds, previous_sequence = setter[key][:data][:id].split("-").map(&:to_i)
         return unless valid_data(milliseconds, sequence, previous_milliseconds, previous_sequence)
 
         setter[key] = { data: data, created_at: Time.now, ttl: -1, type: "stream" }
@@ -130,7 +131,7 @@ class CommandHandler
           return raise_stream_error("ERR The ID specified in XADD must be greater than 0-0")
         end
 
-        setter[key] = { data: hash, created_at: Time.now, ttl: -1, type: "stream" }
+        setter[key] = { data: [hash], created_at: Time.now, ttl: -1, type: "stream" }
       end
       client.write(parser.encode(id, "bulk_string"))
     end
@@ -146,15 +147,39 @@ class CommandHandler
   end
   
   def valid_data(milliseconds, sequence, previous_milliseconds = 0, previous_sequence = 0)
+    p "milliseconds: #{milliseconds}, sequence: #{sequence}, previous_milliseconds: #{previous_milliseconds}, previous_sequence: #{previous_sequence}"
     if milliseconds.zero? && sequence.zero?
       raise_stream_error("ERR The ID specified in XADD must be greater than 0-0")
       return false
-    elsif previous_sequence >= sequence || previous_milliseconds > milliseconds
+    elsif previous_milliseconds > milliseconds
+      raise_stream_error("ERR The ID specified in XADD is equal or smaller than the target stream top item")
+      return false
+    elsif previous_milliseconds == milliseconds && previous_sequence >= sequence
       raise_stream_error("ERR The ID specified in XADD is equal or smaller than the target stream top item")
       return false
     else
       return true
     end
+  end
+  
+  def auto_generate_id(key, id)
+    timestamp, sequence = id.split("-")
+    if sequence == "*"
+      if setter.has_key?(key)
+        data = setter[key][:data]
+        data_with_same_timestamp = data.select { |k| k[:id].split("-").first == timestamp }
+
+        if !data_with_same_timestamp.empty?
+          sequence = (data_with_same_timestamp.last[:id].split("-").last.to_i + 1).to_s
+        else
+          sequence = "0"
+        end
+      else
+        sequence = "1"
+      end
+    end
+
+    return "#{timestamp}-#{sequence}"
   end
 end
 
