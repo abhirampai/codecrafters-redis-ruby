@@ -103,6 +103,12 @@ class CommandHandler
       message = server.replicas_ack.positive? ? server.replicas_ack : server.replicas.length
       server.update_replicas_ack(true, 0)
       client.write(parser.encode(message, "integer"))
+    when "type"
+      if setter.has_key?(messages[0])
+        client.write(parser.encode("string", "simple_string"))
+      else
+       client.write(parser.encode("none", "simple_string"))
+      end
     end
     update_commands_processed
   end
