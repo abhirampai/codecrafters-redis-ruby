@@ -140,6 +140,9 @@ class CommandHandler
       end_id = messages[2]
       copy_item = false
       data_range = []
+      if start_id == "-"
+        start_id = setter[key][:data].first[:id]
+      end
       setter[key][:data].each do |item|
         if item[:id].include?(start_id)
           copy_item = true
