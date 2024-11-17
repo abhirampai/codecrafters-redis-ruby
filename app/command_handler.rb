@@ -164,6 +164,11 @@ class CommandHandler
   
   def auto_generate_id(key, id)
     timestamp, sequence = id.split("-")
+    if timestamp == "*"
+      timestamp = (Time.now.to_f * 1000).to_i
+      sequence = "0"
+    end
+
     if sequence == "*"
       if setter.has_key?(key)
         data = setter[key][:data]
