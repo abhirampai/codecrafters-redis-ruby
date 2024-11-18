@@ -168,25 +168,23 @@ class CommandHandler
       client.write(parser.encode(result, "array"))
     when "xread"
       subcommand = messages[0]
+      is_zero_block_ms = false
       if subcommand == "block"
+        is_zero_block_ms = messages[1].to_i.zero?
         block_in_ms = Time.now + messages[1].to_i / 1000
+        
+        if is_zero_block_ms
+          loop do
+            response = handle_xread_command(no_write: true)
+            break if response
+          end
+        end
         while Time.now < block_in_ms
           sleep(0.1)
         end
       end
-      start_index = messages.index("streams") + 1
-      number_of_streams = messages[start_index..].length / 2
-      response = []
-      number_of_streams.times do |n|
-        result = process_xread_command(n + start_index, number_of_streams)
-        response << result unless result.empty?
-      end
 
-      if response.empty?
-        client.write(parser.encode("", "bulk_string"))
-      else
-        client.write(parser.encode(response, "array"))
-      end
+      handle_xread_command
     end
     update_commands_processed
   end
@@ -237,6 +235,24 @@ class CommandHandler
     end
 
     return "#{timestamp}-#{sequence}"
+  end
+  
+  def handle_xread_command(no_write = false)
+    start_index = messages.index("streams") + 1
+    number_of_streams = messages[start_index..].length / 2
+    response = []
+    number_of_streams.times do |n|
+      result = process_xread_command(n + start_index, number_of_streams)
+      response << result unless result.empty?
+    end
+
+    if response.empty?
+      client.write(parser.encode("", "bulk_string")) unless no_write
+      return false
+    else
+      client.write(parser.encode(response, "array")) unless no_write
+      return true
+    end
   end
   
   def process_xread_command(index, offset)
