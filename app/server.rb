@@ -152,7 +152,7 @@ class RedisServer
         parsed_data = parser.parse
         command, *messages = parsed_data[:data]
         length_of_data = data[current_index...current_index + parsed_data[:current_index] - 2].size
-        if multi_activated[client] && command.downcase != "exec"
+        if multi_activated[client] && !%w[exec discard].include?(command.downcase)
           multi_commands_queue << [command, messages, client, setter, parser, length_of_data, self]
           client.write(parser.encode("QUEUED", "simple_string"))
         else

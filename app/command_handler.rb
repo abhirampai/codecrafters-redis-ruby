@@ -229,9 +229,17 @@ class CommandHandler
             command_handler.handle(no_write: true)
             responses << command_handler.queued_responses
           end
-          
+          server.multi_commands_queue = []
           client.write("*#{responses.flatten.size}\r\n#{responses.flatten.join}")
         end
+      end
+    when "discard"
+      if !server.multi_activated[client]
+        client.write(parser.encode("ERR DISCARD without MULTI", "simple_error"))
+      else
+        server.multi_commands_queue = []
+        client.write(parser.encode("OK", "simple_string"))
+        server.multi_activated[client] = false
       end
     end
     update_commands_processed
