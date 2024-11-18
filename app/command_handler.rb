@@ -172,10 +172,11 @@ class CommandHandler
       if subcommand == "block"
         is_zero_block_ms = messages[1].to_i.zero?
         block_in_ms = Time.now + messages[1].to_i / 1000
+        old_stream = Marshal.load(Marshal.dump(setter))
         
         if is_zero_block_ms
           loop do
-            response = handle_xread_command(no_write: true)
+            response = handle_xread_command(true, old_stream)
             break if response
           end
         end
@@ -184,7 +185,7 @@ class CommandHandler
         end
       end
 
-      handle_xread_command
+      handle_xread_command(false, old_stream)
     end
     update_commands_processed
   end
@@ -237,12 +238,12 @@ class CommandHandler
     return "#{timestamp}-#{sequence}"
   end
   
-  def handle_xread_command(no_write = false)
+  def handle_xread_command(no_write = false, old_stream = setter)
     start_index = messages.index("streams") + 1
     number_of_streams = messages[start_index..].length / 2
     response = []
     number_of_streams.times do |n|
-      result = process_xread_command(n + start_index, number_of_streams)
+      result = process_xread_command(n + start_index, number_of_streams, old_stream)
       response << result unless result.empty?
     end
 
@@ -255,10 +256,14 @@ class CommandHandler
     end
   end
   
-  def process_xread_command(index, offset)
+  def process_xread_command(index, offset, old_stream)
     key = messages[index]
     stream_id = messages[index + offset]
     return [] if !setter[key]
+    
+    if stream_id == "$"
+      stream_id = old_stream[key][:data].last[:id]
+    end
 
     data_range = []
     copy_item = false
