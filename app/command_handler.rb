@@ -3,6 +3,8 @@ require_relative "resp_parser"
 
 class CommandHandler
   attr_reader :command, :messages, :client, :setter, :parser, :data_size, :server
+  
+  attr_accessor :queued_responses
 
   def initialize(command, messages, client, setter, parser, data_size, server)
     @command = command
@@ -12,16 +14,19 @@ class CommandHandler
     @parser = parser
     @data_size = data_size
     @server = server
+    @queued_responses = []
   end
 
-  def handle
+  def handle(no_write: false)
     p "handle command #{command} with messages #{messages}"
     case command.downcase
     when "ping"
-      client.write("+PONG\r\n") if server.replica == false
+      @queued_responses << "+PONG\r\n"
+      client.write("+PONG\r\n") if server.replica == false && !no_write
     when "echo"
       messages.each do |message|
-        client.write(parser.encode(message, "bulk_string"))
+        @queued_responses << parser.encode(message, "bulk_string")
+        client.write(parser.encode(message, "bulk_string")) if !no_write
       end
     when "set"
       @setter[messages[0]] = { data: messages[1], created_at: Time.now, ttl: -1, type: "string" }
@@ -31,24 +36,29 @@ class CommandHandler
       end
       
       if server.replica == false
-        client.write(parser.encode("OK", "simple_string"))
+        @queued_responses << parser.encode("OK", "simple_string")
+        client.write(parser.encode("OK", "simple_string")) unless no_write
         server.send_buffer_message(["SET", messages[0], messages[1]])
       end
     when "get"
       key = messages[0]
       if setter.has_key?(key)
         if setter[key][:ttl] == -1
-          client.write(parser.encode(setter[key][:data], "bulk_string"))
+          @queued_responses << parser.encode(setter[key][:data], "bulk_string")
+          client.write(parser.encode(setter[key][:data], "bulk_string")) unless no_write
         else
           ellapsed_time_in_milliseconds = ((Time.now - setter[key][:created_at]) * 1000).to_f
           if ellapsed_time_in_milliseconds < setter[key][:ttl]
-            client.write(parser.encode(setter[key][:data], "bulk_string"))
+            @queued_responses << parser.encode(setter[key][:data], "bulk_string")
+            client.write(parser.encode(setter[key][:data], "bulk_string")) unless no_write
           else
-            client.write(parser.encode("", "bulk_string"))
+            @queued_responses << parser.encode("", "bulk_string")
+            client.write(parser.encode("", "bulk_string")) unless no_write
           end
         end
       else
-        client.write(parser.encode("", "bulk_string"))
+        @queued_responses << parser.encode("", "bulk_string")
+        client.write(parser.encode("", "bulk_string")) unless no_write
       end
     when "config"
       sub_command = messages[0].downcase
@@ -191,13 +201,16 @@ class CommandHandler
       if setter.has_key?(key)
         if Integer(setter[key][:data], exception: false)
           setter[key][:data] = (setter[key][:data].to_i + 1).to_s
-          client.write(parser.encode(setter[key][:data], "integer"))
+          @queued_responses << parser.encode(setter[key][:data], "integer")
+          client.write(parser.encode(setter[key][:data], "integer")) unless no_write
         else
-          client.write(parser.encode("ERR value is not an integer or out of range", "simple_error"))
+          @queued_responses << parser.encode("ERR value is not an integer or out of range", "simple_error")
+          client.write(parser.encode("ERR value is not an integer or out of range", "simple_error")) unless no_write
         end
       else
         setter[key] = { data: "1", created_at: Time.now.to_i, ttl: -1 }
-        client.write(parser.encode(setter[key][:data], "integer"))
+        @queued_responses << parser.encode(setter[key][:data], "integer")
+        client.write(parser.encode(setter[key][:data], "integer")) unless no_write
       end
     when "multi"
       server.multi_activated = { client => true }
@@ -210,12 +223,14 @@ class CommandHandler
         if server.multi_commands_queue.empty?
           client.write(parser.encode([], "array"))
         else
-          server.multi_commands_queue.each do |command, messages, _, setter, parser, data_size, _|
-            Thread.new(command, messages, client, setter, parser, data_size, server) do |command, messages, client, setter, parser, data_size, server|
-              command_handler = CommandHandler.new(command, messages, client, setter, parser, data_size, server)
-              command_handler.handle
-            end
+          responses = []
+          server.multi_commands_queue.each_with_index do |(command, messages, _, setter, parser, data_size, _), idx|
+            command_handler = CommandHandler.new(command, messages, client, setter, parser, data_size, server)
+            command_handler.handle(no_write: true)
+            responses << command_handler.queued_responses
           end
+          
+          client.write("*#{responses.flatten.size}\r\n#{responses.flatten.join}")
         end
       end
     end
