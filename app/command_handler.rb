@@ -186,6 +186,14 @@ class CommandHandler
       end
 
       handle_xread_command(false, old_stream)
+    when "incr"
+      key = messages[0]
+      if setter.has_key?(key)
+        setter[key][:data] = setter[key][:data].to_i + 1
+        client.write(parser.encode(setter[key][:data], "integer"))
+      else
+        client.write(parser.encode(0, "integer"))
+      end
     end
     update_commands_processed
   end
