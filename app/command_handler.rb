@@ -189,10 +189,11 @@ class CommandHandler
     when "incr"
       key = messages[0]
       if setter.has_key?(key)
-        setter[key][:data] = setter[key][:data].to_i + 1
+        setter[key][:data] = (setter[key][:data].to_i + 1).to_s
         client.write(parser.encode(setter[key][:data], "integer"))
       else
-        client.write(parser.encode(0, "integer"))
+        setter[key] = { data: "1", created_at: Time.now.to_i, ttl: -1 }
+        client.write(parser.encode(setter[key][:data], "integer"))
       end
     end
     update_commands_processed
