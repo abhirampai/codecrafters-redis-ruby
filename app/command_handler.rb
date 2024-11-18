@@ -199,6 +199,9 @@ class CommandHandler
         setter[key] = { data: "1", created_at: Time.now.to_i, ttl: -1 }
         client.write(parser.encode(setter[key][:data], "integer"))
       end
+    when "multi"
+      server.multi_activated = true
+      client.write(parser.encode("OK", "simple_string"))
     end
     update_commands_processed
   end

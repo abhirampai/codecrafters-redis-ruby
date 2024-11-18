@@ -5,7 +5,7 @@ require_relative "tcp_connection"
 
 class RedisServer
   attr_reader :server, :clients, :setter, :dir, :dbfilename, :port, :replica, :master_replid
-  attr_accessor :replica_buffer_commands, :replicas, :sockets, :commands_processed_in_bytes, :replicas_ack
+  attr_accessor :replica_buffer_commands, :replicas, :sockets, :commands_processed_in_bytes, :replicas_ack, :multi_activated
 
   def initialize(arguments)
     @clients = []
@@ -18,6 +18,7 @@ class RedisServer
     @replicas_ack = 0
     @mutex = Mutex.new
     @command_mutex = Mutex.new
+    @multi_activated = false
     parse_arguments(arguments)
     set_default_port if !server
     populate_setter_with_rdb_file_data if dir && dbfilename
