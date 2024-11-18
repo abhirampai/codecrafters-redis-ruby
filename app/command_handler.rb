@@ -200,13 +200,13 @@ class CommandHandler
         client.write(parser.encode(setter[key][:data], "integer"))
       end
     when "multi"
-      server.multi_activated = true
+      server.multi_activated = { client => true }
       client.write(parser.encode("OK", "simple_string"))
     when "exec"
-      if !server.multi_activated
+      if !server.multi_activated[client]
         client.write(parser.encode("ERR EXEC without MULTI", "simple_error"))
       else
-        server.multi_activated = false
+        server.multi_activated[client] = false
         if server.multi_commands_queue.empty?
           client.write(parser.encode([], "array"))
         else

@@ -18,7 +18,7 @@ class RedisServer
     @replicas_ack = 0
     @mutex = Mutex.new
     @command_mutex = Mutex.new
-    @multi_activated = false
+    @multi_activated = {}
     @multi_commands_queue = []
     parse_arguments(arguments)
     set_default_port if !server
@@ -152,8 +152,9 @@ class RedisServer
         parsed_data = parser.parse
         command, *messages = parsed_data[:data]
         length_of_data = data[current_index...current_index + parsed_data[:current_index] - 2].size
-        if multi_activated && command.downcase != "exec"
+        if multi_activated[client] && command.downcase != "exec"
           multi_commands_queue << [command, messages, client, setter, parser, length_of_data, self]
+          client.write(parser.encode("QUEUED", "simple_string"))
         else
           Thread.new(command, messages, client, setter, parser, length_of_data, self) do |command, messages, client, setter, parser, length_of_data, self_reference|
             command_handler = CommandHandler.new(command, messages, client, setter, parser, length_of_data, self_reference)
