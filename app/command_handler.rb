@@ -202,6 +202,18 @@ class CommandHandler
     when "multi"
       server.multi_activated = true
       client.write(parser.encode("OK", "simple_string"))
+    when "exec"
+      if !server.multi_activated
+        client.write(parser.encode("ERR EXEC without MULTI", "simple_error"))
+      else
+        server.multi_activated = false
+        server.multi_commands_queue.each do |command, messages, client, setter, parser, data_size, server|
+          Thread.new(command, messages, client, setter, parser, data_size, server) do |command, messages, client, setter, parser, data_size, server|
+            command_handler = CommandHandler.new(command, messages, client, setter, parser, data_size, server)
+            command_handler.handle
+          end
+        end
+      end
     end
     update_commands_processed
   end

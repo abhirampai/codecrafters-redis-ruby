@@ -5,7 +5,7 @@ require_relative "tcp_connection"
 
 class RedisServer
   attr_reader :server, :clients, :setter, :dir, :dbfilename, :port, :replica, :master_replid
-  attr_accessor :replica_buffer_commands, :replicas, :sockets, :commands_processed_in_bytes, :replicas_ack, :multi_activated
+  attr_accessor :replica_buffer_commands, :replicas, :sockets, :commands_processed_in_bytes, :replicas_ack, :multi_activated, :multi_commands_queue
 
   def initialize(arguments)
     @clients = []
@@ -19,6 +19,7 @@ class RedisServer
     @mutex = Mutex.new
     @command_mutex = Mutex.new
     @multi_activated = false
+    @multi_commands_queue = []
     parse_arguments(arguments)
     set_default_port if !server
     populate_setter_with_rdb_file_data if dir && dbfilename
@@ -151,9 +152,13 @@ class RedisServer
         parsed_data = parser.parse
         command, *messages = parsed_data[:data]
         length_of_data = data[current_index...current_index + parsed_data[:current_index] - 2].size
-        Thread.new(command, messages, client, setter, parser, length_of_data, self) do |command, messages, client, setter, parser, length_of_data, self_reference|
-          command_handler = CommandHandler.new(command, messages, client, setter, parser, length_of_data, self_reference)
-          command_handler.handle
+        if multi_activated
+          multi_commands_queue << [command, messages, client, setter, parser, length_of_data, self]
+        else
+          Thread.new(command, messages, client, setter, parser, length_of_data, self) do |command, messages, client, setter, parser, length_of_data, self_reference|
+            command_handler = CommandHandler.new(command, messages, client, setter, parser, length_of_data, self_reference)
+            command_handler.handle
+          end
         end
         current_index += parsed_data[:current_index] - 2
       end
