@@ -207,10 +207,14 @@ class CommandHandler
         client.write(parser.encode("ERR EXEC without MULTI", "simple_error"))
       else
         server.multi_activated = false
-        server.multi_commands_queue.each do |command, messages, client, setter, parser, data_size, server|
-          Thread.new(command, messages, client, setter, parser, data_size, server) do |command, messages, client, setter, parser, data_size, server|
-            command_handler = CommandHandler.new(command, messages, client, setter, parser, data_size, server)
-            command_handler.handle
+        if server.multi_commands_queue.empty?
+          client.write(parser.encode([], "array"))
+        else
+          server.multi_commands_queue.each do |command, messages, _, setter, parser, data_size, _|
+            Thread.new(command, messages, client, setter, parser, data_size, server) do |command, messages, client, setter, parser, data_size, server|
+              command_handler = CommandHandler.new(command, messages, client, setter, parser, data_size, server)
+              command_handler.handle
+            end
           end
         end
       end

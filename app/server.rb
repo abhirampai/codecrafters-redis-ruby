@@ -152,7 +152,7 @@ class RedisServer
         parsed_data = parser.parse
         command, *messages = parsed_data[:data]
         length_of_data = data[current_index...current_index + parsed_data[:current_index] - 2].size
-        if multi_activated
+        if multi_activated && command.downcase != "exec"
           multi_commands_queue << [command, messages, client, setter, parser, length_of_data, self]
         else
           Thread.new(command, messages, client, setter, parser, length_of_data, self) do |command, messages, client, setter, parser, length_of_data, self_reference|
