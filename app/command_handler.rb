@@ -213,23 +213,23 @@ class CommandHandler
         client.write(parser.encode(setter[key][:data], "integer")) unless no_write
       end
     when "multi"
-      server.multi_activated = { client => true }
+      server.multi_activated[client] = true
       client.write(parser.encode("OK", "simple_string"))
     when "exec"
       if !server.multi_activated[client]
         client.write(parser.encode("ERR EXEC without MULTI", "simple_error"))
       else
         server.multi_activated[client] = false
-        if server.multi_commands_queue.empty?
+        if !server.multi_commands_queue[client] || server.multi_commands_queue[client]&.empty?
           client.write(parser.encode([], "array"))
         else
           responses = []
-          server.multi_commands_queue.each_with_index do |(command, messages, _, setter, parser, data_size, _), idx|
+          server.multi_commands_queue[client].each do |command, messages, _, setter, parser, data_size, _|
             command_handler = CommandHandler.new(command, messages, client, setter, parser, data_size, server)
             command_handler.handle(no_write: true)
             responses << command_handler.queued_responses
           end
-          server.multi_commands_queue = []
+          server.multi_commands_queue[client] = []
           client.write("*#{responses.flatten.size}\r\n#{responses.flatten.join}")
         end
       end
@@ -237,7 +237,7 @@ class CommandHandler
       if !server.multi_activated[client]
         client.write(parser.encode("ERR DISCARD without MULTI", "simple_error"))
       else
-        server.multi_commands_queue = []
+        server.multi_commands_queue[client] = []
         client.write(parser.encode("OK", "simple_string"))
         server.multi_activated[client] = false
       end

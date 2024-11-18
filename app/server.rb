@@ -19,7 +19,7 @@ class RedisServer
     @mutex = Mutex.new
     @command_mutex = Mutex.new
     @multi_activated = {}
-    @multi_commands_queue = []
+    @multi_commands_queue = {}
     parse_arguments(arguments)
     set_default_port if !server
     populate_setter_with_rdb_file_data if dir && dbfilename
@@ -153,7 +153,11 @@ class RedisServer
         command, *messages = parsed_data[:data]
         length_of_data = data[current_index...current_index + parsed_data[:current_index] - 2].size
         if multi_activated[client] && !%w[exec discard].include?(command.downcase)
-          multi_commands_queue << [command, messages, client, setter, parser, length_of_data, self]
+          if multi_commands_queue.has_key?(client)
+            multi_commands_queue[client] << [command, messages, client, setter, parser, length_of_data, self]
+          else
+            multi_commands_queue[client] = [[command, messages, client, setter, parser, length_of_data, self]]
+          end
           client.write(parser.encode("QUEUED", "simple_string"))
         else
           Thread.new(command, messages, client, setter, parser, length_of_data, self) do |command, messages, client, setter, parser, length_of_data, self_reference|
